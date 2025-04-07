@@ -1,0 +1,151 @@
+install.packages("brglm2")  # Si no lo tienes instalado
+library(brglm2)
+library(brglm)
+library(dplyr)
+
+
+data <- read.csv("Clean_Pristidae_data.csv", header = T)  # Replace with your actual file
+head(data)
+
+#REMOVE COLUMNS X, X.1, ETC
+data <- data %>% select(-X, -X.1, -X.2, -X.3, -X.4, -X.5)
+
+#Check the data
+str(data)  # Check data structure
+#column names
+colnames(data2)
+
+
+#CLEAN the NA
+data2 <- data%>%
+  filter(!is.na(Salinity))
+#data2 <- na.omit(data2$DNA.ID) 
+data2 <- data2 %>% select(-X, -X.1, -X.2)
+
+data2$Presence.Absence <- as.numeric(as.character(data2$Presence.Absence))
+data2$Salinity <- as.numeric(as.character(data2$Salinity))
+
+colnames(data2)
+
+# Modelo data2# Modelo con sesgo de Firth
+model_firth <- brglm(Presence.Absence ~ Salinity + T.C , 
+                     family = binomial, data = data2, method = "brglm.fit")
+
+summary(model_firth)
+
+#Gráficar
+
+# Load necessary libraries
+library(ggplot2)
+
+# Create a sequence of salinity values for prediction
+salinity_range <- data.frame(Salinity = seq(min(data2$Salinity, na.rm = TRUE), 
+                                            max(data2$Salinity, na.rm = TRUE), 
+                                            length.out = 100))
+#Temperature
+
+Temperature_Range <- data.frame(Temperature..C= seq(min(data2$Salinity, na.rm = TRUE), 
+                                                   max(data2$Salinity, na.rm = TRUE), 
+                                                   length.out = 100))
+
+# Use the median Temperature to keep it constant in predictions
+salinity_range$T.C <- median(data2$T.C, na.rm = TRUE)
+
+Temperature_Range$Salinity <- median(data2$Salinity, na.rm = T)
+
+# Predict probability using the model
+salinity_range$prob <- predict(model_firth, newdata = salinity_range, type = "response")
+Temperature_Range$prob <-predict(model_firth, newdata = Temperature_Range, type = "response")
+
+#Salinity
+ggplot(data2, aes(x = Salinity, y = Presence.Absence)) +
+  geom_jitter(height = 0.05, width = 0, alpha = 0.4) +  # Add points with slight jitter
+  geom_line(data = salinity_range, aes(x = Salinity, y = prob), color = "blue", size = 1) +  # Model prediction
+  labs(title = "Firth's Logistic Regression Response Curve",
+       x = "Salinity",
+       y = "Probability of Presence") +
+  theme_minimal()
+
+#PRUEBAA
+
+# Graficar
+ggplot(data2, aes(x = Salinity, y = Presence.Absence)) +
+  geom_jitter(height = 0.05, width = 0, alpha = 0.4, color = "gray40") +
+  geom_line(data = salinity_range, aes(x = Salinity, y = prob), color = "blue", size = 1.2) +
+  scale_x_continuous(breaks = seq(0, 40, by = 5)) +  # Modifica aquí según el rango real
+  scale_y_continuous(breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  labs(title = "Curva de Respuesta - Regresión Logística de Firth",
+       x = "Salinidad (ppt)",
+       y = "Probabilidad de Presencia") +
+  theme_minimal(base_size = 14)
+
+#Temperature
+ggplot(data2, aes(x = Temperature..C, y = Presence.Absence)) +
+  geom_jitter(height = 0.05, width = 0, alpha = 0.4) +  # Add points with slight jitter
+  geom_line(data = Temperature_Range, aes(x = Temperature..C, y = prob), color = "blue", size = 1) +  # Model prediction
+  labs(title = "Firth's Logistic Regression Response Curve",
+       x = "Temperature",
+       y = "Probability of Presence") +
+  theme_minimal()
+#########################ISLA CAÑA############################################
+
+Azuero <- read.csv('Azuero_clean.csv', header= T)
+
+#REMOVE COLUMNS X, X.1, ETC
+Azuero <- Azuero %>% select(-X, -X.1, -X.2)
+
+sum(is.na(Azuero))  # Count remaining NA values
+
+Azuero2 <- Azuero%>%
+  filter(!is.na(n))
+Azuero2 <- Azuero%>%
+  filter(!is.na(Salinity))
+
+Azuero2$Salinity_Bin <- ifelse(Azuero2$Salinity > median(Azuero2$Salinity, na.rm = TRUE), "Alta", "Baja")
+
+# Crear una variable categórica (alta/baja salinidad)
+Azuero2 <- Azuero2 %>%
+  mutate(Salinity_Bin = ifelse(Salinity > median(Salinity, na.rm = TRUE), "Alta", "Baja"))
+
+# Crear tabla de contingencia
+tabla_Azuero2 <- table(Azuero2$Presence.Absence, Azuero2$Salinity_Bin)
+
+# Prueba exacta de Fisher
+resultado_azuero2 <- fisher.test(tabla_Azuero2)
+
+# Mostrar resultado
+print(resultado_azuero2)
+Azuero2$Presence.Absence <- as.factor(Azuero2$Presence.Absence)
+#Azuero2$Presence.Absence <- as.numeric(as.character(Azuero2$Presence.Absence))
+Azuero2$Salinity <- as.numeric(as.character(Azuero2$Salinity))
+Azuero2$T.C <- as.numeric(as.character(Azuero2$T.C))
+str(Azuero2)
+#MODELO firth 
+model_firth2 <- brglm(Presence.Absence ~ Salinity + T.C, 
+                     family = binomial, data = Azuero2, method = "brglm.fit")
+
+summary(model_firth)
+# Create a sequence of salinity values for prediction
+salinity_range_azuero <- data.frame(Salinity = seq(min(Azuero2$Salinity, na.rm = TRUE), 
+                                            max(data2$Salinity, na.rm = TRUE), 
+                                            length.out = 100))
+
+salinity_range_azuero$T.C <- median(data2$T.C, na.rm = TRUE)
+
+salinity_range_azuero$prob <- predict(model_firth2, newdata = salinity_range_azuero, type = "response")
+
+ggplot(Azuero2, aes(x = Salinity, y = Presence.Absence)) +
+  geom_jitter(height = 0.05, width = 0, alpha = 0.4) +  # Add points with slight jitter
+  geom_line(data = salinity_range, aes(x = Salinity, y = prob), color = "blue", size = 1) +  # Model prediction
+  labs(title = "Firth's Logistic Regression Response Curve",
+       x = "Salinity",
+       y = "Probability of Presence") +
+  theme_minimal()
+
+#Temperature
+
+Temperature_Range <- data.frame(Temperature..C= seq(min(data2$Salinity, na.rm = TRUE), 
+                                                    max(data2$Salinity, na.rm = TRUE), 
+                                                    length.out = 100))
+
+str(Azuero2)
